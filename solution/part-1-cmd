@@ -1,0 +1,5 @@
+podman run --rm -dt --name csvserver \
+		-p 9300:9300 \
+		-v ../inputFile:/csvserver/inputdata:z \
+		-e CSVSERVER_BORDER=Orange \
+		infracloudio/csvserver:latest
