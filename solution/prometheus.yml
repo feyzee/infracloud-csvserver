@@ -1,0 +1,15 @@
+#global config
+global:
+  scrape_interval: 15s
+  evaluation_interval: 5s
+  scrape_timeout: 10s
+  external_labels:
+    monitor: "csvserver-monitor"
+
+# Scrape configs for targets
+scrape_configs:
+  - job_name: "csvserver"
+    scrape_interval: 5s
+    static_configs:
+      - targets: ["csvserver:9393"]
+    metrics_path: /metrics
