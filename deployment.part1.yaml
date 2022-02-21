@@ -1,0 +1,163 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inputfile
+  namespace: default
+data:
+  InputFile: |
+    1,12476
+    2,30387
+    3,26778
+    4,11544
+    5,1355
+    6,25315
+    7,23888
+    8,27593
+    9,11978
+    10,9981
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: default
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 5s
+      scrape_timeout: 10s
+      external_labels:
+        monitor: "csvserver-monitor"
+    scrape_configs:
+      - job_name: "csvserver"
+        scrape_interval: 5s
+        static_configs:
+          - targets: ["csvserver:9393"]
+        metrics_path: /metrics
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: csvserver
+  namespace: default
+spec:
+  selector:
+    app: csvserver
+  ports:
+    - port: 9300
+      protocol: TCP
+      targetPort: 9393
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: default
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - port: 9090
+      protocol: TCP
+      targetPort: 9090
+
+---
+Version: apps/v1
+kind: Deployment
+metadata:
+  name: csvserver
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: csvserver
+  template:
+    metadata:
+      labels:
+        app: csvserver
+    spec:
+      containers:
+        - name: csvserver
+          image: infracloudio/csvserver:latest
+          env:
+            - name: CSVSERVER_BORDER
+              value: Orange
+          resources:
+            limits:
+              memory: 128Mi
+              cpu: 500m
+          volumeMounts:
+            - name: input-data
+              mountPath: /csvserver/inputdata
+              readOnly: true
+              subPath: inputFile
+          ports:
+            - containerPort: 9393
+      volumes:
+        - name: input-data
+          configMap:
+            name: inputfile
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: prometheus-pv
+spec:
+  accessModes:
+    - ReadWriteMany
+  capacity:
+    storage: 1Gi
+  persistentVolumeReclaimPolicy: Retain
+  volumeMode: Filesystem
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: prometheus
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: prometheus
+  serviceName: prometheus
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.22.0
+          ports:
+            - containerPort: 9090
+              name: web
+          resources:
+            limits:
+              memory: 256Mi
+              cpu: 500m
+          volumeMounts:
+            - name: prometheus-config
+              mountPath: /etc/prometheus/prometheus.yml
+              readOnly: true
+              subPath: prometheus.yml
+  volumes:
+    - name: prometheus-config
+      configMap:
+        name: prometheus-config
+  volumeClaimTemplates: # TODO
+    - metadata:
+        name: prometheus-data
+      spec:
+        accessModes: ["ReadWriteMany"]
+        resources:
+          requests:
+            storage: 1Gi

@@ -1,0 +1,170 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gencsv
+  namespace: default
+data:
+  gencsv.sh: |
+    #!/bin/sh
+    if [ $# -eq 0 ]; then
+      seq_var=10
+    else
+      seq_var=$1
+    fi
+    for i in `seq 1 $seq_var`
+    do
+      printf "$i,$RANDOM\n" >> /csvserver/inputFile
+    done
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: default
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 5s
+      scrape_timeout: 10s
+      external_labels:
+        monitor: "csvserver-monitor"
+    scrape_configs:
+      - job_name: "csvserver"
+        scrape_interval: 5s
+        static_configs:
+          - targets: ["csvserver:9393"]
+        metrics_path: /metrics
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: csvserver
+  namespace: default
+spec:
+  selector:
+    app: csvserver
+  ports:
+    - port: 9300
+      protocol: TCP
+      targetPort: 9393
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: default
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - port: 9090
+      protocol: TCP
+      targetPort: 9090
+
+---
+Version: apps/v1
+kind: Deployment
+metadata:
+  name: csvserver
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: csvserver
+  template:
+    metadata:
+      labels:
+        app: csvserver
+    spec:
+      initContainers:
+        - name: busybox
+          image: busybox:latest
+          command: ["sh", "-c", "/vol/gencsv.sh"]
+          volumeMounts:
+            - name: gencsv
+              mountPath: /vol
+            - name: input-data
+              mountPath: /csvserver
+      containers:
+        - name: csvserver
+          image: infracloudio/csvserver:latest
+          env:
+            - name: CSVSERVER_BORDER
+              value: Orange
+          resources:
+            limits:
+              memory: 128Mi
+              cpu: 500m
+          volumeMounts:
+            - name: inputfile
+              mountPath: /csvserver/inputdata
+              readOnly: true
+              subPath: inputFile
+          ports:
+            - containerPort: 9393
+      volumes:
+        - name: gencsv
+          configMap:
+            name: gencsv
+        - name: input-data
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 1Gi
+  volumeMode: Filesystem
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: prometheus
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: prometheus
+  serviceName: prometheus
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.22.0
+          ports:
+            - containerPort: 9090
+              name: web
+          resources:
+            limits:
+              memory: 256Mi
+              cpu: 500m
+          volumeMounts:
+            - name: prometheus-config
+              mountPath: /etc/prometheus/prometheus.yml
+              readOnly: true
+  volumeClaimTemplates:
+    - metadata:
+        name: prometheus-config
+      spec:
+        accessModes: ["ReadOnlyMany"]
+        resources:
+          requests:
+            storage: 1Gi
