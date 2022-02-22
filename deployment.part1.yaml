@@ -149,6 +149,8 @@ spec:
               mountPath: /etc/prometheus/prometheus.yml
               readOnly: true
               subPath: prometheus.yml
+            - name: prometheus-data
+              mountPath: /metrics
   volumes:
     - name: prometheus-config
       configMap:
