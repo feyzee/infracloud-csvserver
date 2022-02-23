@@ -67,7 +67,7 @@ spec:
       targetPort: 9090
 
 ---
-Version: apps/v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: csvserver
@@ -96,7 +96,7 @@ spec:
             - name: input-data
               mountPath: /csvserver/inputdata
               readOnly: true
-              subPath: inputFile
+              subPath: InputFile
           ports:
             - containerPort: 9393
       volumes:
@@ -116,6 +116,8 @@ spec:
     storage: 1Gi
   persistentVolumeReclaimPolicy: Retain
   volumeMode: Filesystem
+  hostPath:
+    path: /tmp/prometheus
 
 ---
 apiVersion: apps/v1
@@ -151,11 +153,11 @@ spec:
               subPath: prometheus.yml
             - name: prometheus-data
               mountPath: /metrics
-  volumes:
-    - name: prometheus-config
-      configMap:
-        name: prometheus-config
-  volumeClaimTemplates: # TODO
+      volumes:
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config
+  volumeClaimTemplates:
     - metadata:
         name: prometheus-data
       spec:

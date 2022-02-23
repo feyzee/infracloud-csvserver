@@ -67,7 +67,7 @@ spec:
       targetPort: 9090
 
 ---
-Version: apps/v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: csvserver
@@ -102,7 +102,7 @@ spec:
               memory: 128Mi
               cpu: 500m
           volumeMounts:
-            - name: inputfile
+            - name: input-data
               mountPath: /csvserver/inputdata
               readOnly: true
               subPath: inputFile
@@ -117,17 +117,18 @@ spec:
 
 ---
 apiVersion: v1
-kind: PersistentVolumeClaim
+kind: PersistentVolume
 metadata:
-  name: prometheus-pvc
-  namespace: default
+  name: prometheus-pv
 spec:
   accessModes:
-    - ReadOnlyMany
-  resources:
-    requests:
-      storage: 1Gi
+    - ReadWriteMany
+  capacity:
+    storage: 1Gi
+  persistentVolumeReclaimPolicy: Retain
   volumeMode: Filesystem
+  hostPath:
+    path: /tmp/prometheus
 
 ---
 apiVersion: apps/v1
@@ -160,6 +161,7 @@ spec:
             - name: prometheus-config
               mountPath: /etc/prometheus/prometheus.yml
               readOnly: true
+              subPath: prometheus.yml
             - name: prometheus-data
               mountPath: /metrics
   volumes:
