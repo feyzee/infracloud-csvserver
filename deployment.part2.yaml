@@ -164,10 +164,10 @@ spec:
               subPath: prometheus.yml
             - name: prometheus-data
               mountPath: /metrics
-  volumes:
-    - name: prometheus-config
-      configMap:
-        name: prometheus-config
+      volumes:
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config
   volumeClaimTemplates:
     - metadata:
         name: prometheus-data
