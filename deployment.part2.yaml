@@ -122,7 +122,7 @@ metadata:
   name: prometheus-pv
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   capacity:
     storage: 1Gi
   persistentVolumeReclaimPolicy: Retain
@@ -172,7 +172,7 @@ spec:
     - metadata:
         name: prometheus-data
       spec:
-        accessModes: ["ReadWriteMany"]
+        accessModes: ["ReadWriteOnce"]
         resources:
           requests:
             storage: 1Gi
